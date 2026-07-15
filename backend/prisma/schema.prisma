@@ -1,0 +1,326 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum LearningStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  MASTERED
+}
+
+enum MaterialType {
+  VIDEO
+  VIDEO_FILE
+  PDF
+  MARKDOWN
+  SLIDES
+  EXTERNAL_LINK
+  ARTICLE
+  CODE_SNIPPET
+  GITHUB_REPOSITORY
+  YOUTUBE_VIDEO
+  GOOGLE_DRIVE
+  DROPBOX
+  ONEDRIVE
+  ZIP
+  IMAGE
+  INTERNAL_UPLOAD
+  ATTACHMENT
+}
+
+enum QuestionType {
+  MCQ
+  MULTIPLE_ANSWER
+  TRUE_FALSE
+  FILL_IN_BLANK
+  CODING
+  ESSAY
+  FILE_UPLOAD
+  SQL_QUERY
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  FAILURE
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  username     String       @unique
+  passwordHash String
+  role         Role
+  status       UserStatus   @default(ACTIVE)
+  firstName    String
+  lastName     String
+  phone        String?
+  lastActiveAt DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  studentProfile StudentProfile?
+  notifications  Notification[]
+
+  @@index([role])
+  @@index([status])
+}
+
+model StudentProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  enrollmentDate DateTime @default(now())
+  averageScore   Float    @default(0)
+  certificates   Json?
+  attendance     Json?
+
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjects         StudentSubject[]
+  learningStatuses StudentLearningStatus[]
+  moduleProgress   StudentModuleProgress[]
+  attempts         AssessmentAttempt[]
+
+  @@index([enrollmentDate])
+}
+
+model Subject {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String?
+  icon        String?
+  order       Int        @default(0)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  phases   Phase[]
+  students StudentSubject[]
+
+  @@index([order])
+}
+
+model Phase {
+  id           String   @id @default(cuid())
+  subjectId    String
+  title        String
+  description  String?
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  subject Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  modules CourseModule[]
+
+  @@unique([subjectId, displayOrder])
+  @@index([subjectId])
+}
+
+model CourseModule {
+  id           String   @id @default(cuid())
+  phaseId      String
+  title        String
+  description  String?
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  phase             Phase                   @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  learningMaterials LearningMaterial[]
+  assessment        Assessment?
+  progress          StudentModuleProgress[]
+
+  @@unique([phaseId, displayOrder])
+  @@index([phaseId])
+}
+
+model LearningMaterial {
+  id               String       @id @default(cuid())
+  moduleId         String
+  title            String
+  description      String?
+  type             MaterialType
+  contentUrl       String?
+  estimatedMinutes Int?
+  displayOrder     Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  module   CourseModule            @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  statuses StudentLearningStatus[]
+
+  @@unique([moduleId, displayOrder])
+  @@index([moduleId])
+}
+
+model StudentSubject {
+  id         String     @id @default(cuid())
+  studentId  String
+  subjectId  String
+  status     UserStatus @default(ACTIVE)
+  assignedAt DateTime   @default(now())
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, subjectId])
+  @@index([subjectId])
+}
+
+model StudentLearningStatus {
+  id         String         @id @default(cuid())
+  studentId  String
+  materialId String
+  status     LearningStatus @default(NOT_STARTED)
+  updatedAt  DateTime       @updatedAt
+
+  student  StudentProfile  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  material LearningMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, materialId])
+  @@index([materialId])
+}
+
+model StudentModuleProgress {
+  id                String         @id @default(cuid())
+  studentId         String
+  moduleId          String
+  status            LearningStatus @default(NOT_STARTED)
+  completionPercent Float          @default(0)
+  assessmentPassed  Boolean        @default(false)
+  updatedAt         DateTime       @updatedAt
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  module  CourseModule   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, moduleId])
+  @@index([moduleId])
+}
+
+model Assessment {
+  id               String   @id @default(cuid())
+  moduleId         String   @unique
+  title            String
+  description      String?
+  durationMinutes  Int?
+  passingPercent   Float    @default(60)
+  negativeMarking  Boolean  @default(false)
+  shuffleQuestions Boolean  @default(false)
+  shuffleOptions   Boolean  @default(false)
+  attemptsAllowed  Int      @default(1)
+  showResult       Boolean  @default(true)
+  showAnswers      Boolean  @default(false)
+  isPublished      Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  module    CourseModule        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  questions Question[]
+  attempts  AssessmentAttempt[]
+
+  @@index([isPublished])
+}
+
+model Question {
+  id                String     @id @default(cuid())
+  assessmentId      String
+  text              String
+  type              QuestionType
+  difficulty        Difficulty @default(MEDIUM)
+  points            Float      @default(1)
+  correctTextAnswer String?
+  displayOrder      Int        @default(0)
+
+  assessment Assessment         @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  options    QuestionOption[]
+  answers    AssessmentAnswer[]
+
+  @@index([assessmentId])
+}
+
+model QuestionOption {
+  id         String  @id @default(cuid())
+  questionId String
+  text       String
+  isCorrect  Boolean @default(false)
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+model AssessmentAttempt {
+  id               String        @id @default(cuid())
+  assessmentId     String
+  studentId        String
+  startedAt        DateTime      @default(now())
+  submittedAt      DateTime?
+  timeTakenSeconds Int?
+  score            Float         @default(0)
+  passing          Boolean       @default(false)
+  status           AttemptStatus @default(IN_PROGRESS)
+
+  assessment Assessment         @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student    StudentProfile     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers    AssessmentAnswer[]
+
+  @@index([assessmentId])
+  @@index([studentId])
+}
+
+model AssessmentAnswer {
+  id                String   @id @default(cuid())
+  attemptId         String
+  questionId        String
+  selectedOptionIds String[] @default([])
+  textAnswer        String?
+  isCorrect         Boolean?
+  score             Float    @default(0)
+
+  attempt  AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question Question          @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@index([questionId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
