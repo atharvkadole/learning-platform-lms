@@ -1,9 +1,6 @@
 import axios from "axios";
 
-const fallbackBaseUrl =
-  typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}:3000/api/v1`
-    : "http://localhost:3000/api/v1";
+const fallbackBaseUrl = "/api/v1";
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || fallbackBaseUrl,
