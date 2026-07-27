@@ -462,6 +462,22 @@ function ModuleNavItem({ courseModule, index, selected, onSelect }) {
 function ModulePanel({ courseModule, saving, onModuleStatus, onMaterialStatus }) {
   const progress = getModuleProgress(courseModule);
   const assessment = getAssessmentSummary(courseModule.assessment);
+  const materials = useMemo(() => courseModule.learningMaterials || [], [courseModule.learningMaterials]);
+  const [selectedMaterialId, setSelectedMaterialId] = useState("");
+  const selectedMaterial = useMemo(
+    () => materials.find((material) => material.id === selectedMaterialId) || materials[0] || null,
+    [materials, selectedMaterialId],
+  );
+
+  useEffect(() => {
+    if (!materials.length) {
+      if (selectedMaterialId) setSelectedMaterialId("");
+      return;
+    }
+
+    const selectedStillExists = selectedMaterialId && materials.some((material) => material.id === selectedMaterialId);
+    if (!selectedStillExists) setSelectedMaterialId(materials[0].id);
+  }, [courseModule.id, materials, selectedMaterialId]);
 
   return (
     <article className="lms-panel rounded-2xl border p-4">
@@ -497,19 +513,37 @@ function ModulePanel({ courseModule, saving, onModuleStatus, onMaterialStatus })
         <AssessmentMiniCard assessment={courseModule.assessment} summary={assessment} />
       </div>
 
-      <div className="mt-4 space-y-2">
-        {(courseModule.learningMaterials || []).map((material) => (
-          <MaterialCard
-            key={material.id}
-            material={material}
+      {materials.length ? (
+        <div className="mt-4 grid gap-4 2xl:grid-cols-[22rem_minmax(0,1fr)]">
+          <section className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="text-sm font-semibold text-slate-950">Materials</h4>
+              <span className="text-xs font-medium text-slate-500">{materials.length} items</span>
+            </div>
+            <div className="max-h-[30rem] space-y-2 overflow-y-auto pr-1">
+              {materials.map((material, index) => (
+                <MaterialCard
+                  key={material.id}
+                  index={index}
+                  material={material}
+                  selected={material.id === selectedMaterial?.id}
+                  onSelect={() => setSelectedMaterialId(material.id)}
+                />
+              ))}
+            </div>
+          </section>
+
+          <MaterialReader
+            material={selectedMaterial}
             saving={saving}
-            onStatus={(status) => onMaterialStatus(material.id, status)}
+            onStatus={(status) => onMaterialStatus(selectedMaterial.id, status)}
           />
-        ))}
-        {!courseModule.learningMaterials?.length ? (
+        </div>
+      ) : (
+        <div className="mt-4">
           <EmptyState title="No materials yet" description="Your instructor has not added resources for this module." />
-        ) : null}
-      </div>
+        </div>
+      )}
     </article>
   );
 }
@@ -554,28 +588,65 @@ function AssessmentMiniCard({ assessment, summary }) {
   );
 }
 
-function MaterialCard({ material, saving, onStatus }) {
+function MaterialCard({ material, index, selected, onSelect }) {
+  const Icon = getMaterialIcon(material.type);
+  const currentStatus = getMaterialStatus(material);
+  const preview = material.description?.trim();
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        "w-full rounded-xl border p-3 text-left transition",
+        selected ? "border-blue-300 bg-blue-50 shadow-sm" : "border-slate-200 bg-white/70 hover:border-slate-300 hover:bg-slate-50",
+      )}
+      onClick={onSelect}
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <span className={cn("grid size-9 shrink-0 place-items-center rounded-lg", selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700")}>
+          <Icon size={17} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-start justify-between gap-2">
+            <span className="line-clamp-2 text-sm font-semibold text-slate-950">{material.title}</span>
+            <span className="shrink-0 text-xs font-semibold text-slate-500">{index + 1}</span>
+          </span>
+          <span className="mt-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+            {getMaterialTypeLabel(material.type)}
+            {material.estimatedMinutes ? ` / ${material.estimatedMinutes} min` : ""}
+          </span>
+          {preview ? <span className="mt-2 line-clamp-2 block text-xs leading-5 text-slate-500">{preview}</span> : null}
+          <span className="mt-3 block">
+            <StatusBadge value={currentStatus} />
+          </span>
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function MaterialReader({ material, saving, onStatus }) {
   const Icon = getMaterialIcon(material.type);
   const openable = canOpenMaterial(material);
   const currentStatus = getMaterialStatus(material);
+  const content = material.description?.trim();
 
   return (
-    <div className="lms-soft rounded-2xl border p-3">
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+    <section className="lms-soft min-w-0 rounded-2xl border p-4">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700">
-            <Icon size={18} />
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700">
+            <Icon size={20} />
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate font-medium text-slate-950">{material.title}</p>
+              <h4 className="text-base font-semibold text-slate-950">{material.title}</h4>
               <StatusBadge value={currentStatus} />
             </div>
             <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
               {getMaterialTypeLabel(material.type)}
               {material.estimatedMinutes ? ` / ${material.estimatedMinutes} min` : ""}
             </p>
-            {material.description ? <p className="mt-1 text-sm text-slate-500">{material.description}</p> : null}
           </div>
         </div>
 
@@ -597,12 +668,21 @@ function MaterialCard({ material, saving, onStatus }) {
           <MaterialStatusControl value={currentStatus} saving={saving} onChange={onStatus} />
         </div>
       </div>
+
+      <div className="mt-4 max-h-[38rem] overflow-y-auto rounded-2xl border border-slate-200 bg-white/80 p-4">
+        {content ? (
+          <div className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">{content}</div>
+        ) : (
+          <EmptyState title="No lesson text" description="Use the material link or ask the instructor to add lesson content." />
+        )}
+      </div>
+
       {!openable ? (
         <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
           This material does not have a link yet. You can still mark your learning status.
         </p>
       ) : null}
-    </div>
+    </section>
   );
 }
 
