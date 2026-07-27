@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardList, FileText, Plus, Settings, Trash2 } from "lucide-react";
+import { BookOpen, CheckCircle2, ClipboardList, Edit2, FileText, Layers, Plus, Settings, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -14,8 +14,6 @@ import {
   BuilderEmptyState,
   CoursePicker,
   MaterialRow,
-  ModuleRow,
-  PhaseBlock,
 } from "./components/CourseBuilderParts.jsx";
 import {
   AssessmentForm,
@@ -194,9 +192,12 @@ export function LearningPathPage() {
   }, [selectedCourse, selectedPhaseId]);
 
   useEffect(() => {
-    if (!selectedPhase) return;
+    if (!selectedPhase) {
+      if (selectedModuleId) setSelectedModuleId("");
+      return;
+    }
     const stillHasModule = selectedModuleId && selectedPhase.modules.some((courseModule) => courseModule.id === selectedModuleId);
-    if (!stillHasModule) setSelectedModuleId("");
+    if (!stillHasModule) setSelectedModuleId(selectedPhase.modules[0]?.id || "");
   }, [selectedModuleId, selectedPhase]);
 
   useEffect(() => {
@@ -458,6 +459,18 @@ export function LearningPathPage() {
     ),
   };
 
+  function selectPhaseFromNavigator(phase) {
+    setSelectedPhaseId(phase.id);
+    setSelectedModuleId(phase.modules?.[0]?.id || "");
+    closeForm();
+  }
+
+  function selectModuleFromNavigator(phase, courseModule) {
+    setSelectedPhaseId(phase.id);
+    setSelectedModuleId(courseModule.id);
+    closeForm();
+  }
+
   return (
     <div className="space-y-6">
       <Card className="p-6">
@@ -480,26 +493,41 @@ export function LearningPathPage() {
         </div>
       </Card>
 
-      <div className="grid gap-6 xl:grid-rows-[1fr_360px]">
-        <div className="space-y-5">
-          <Card className="p-0">
-            <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-950">Curriculum</h2>
-                <p className="mt-1 text-sm text-slate-500">Phases work like topics. Modules, materials, and assessment stay nested inside.</p>
-              </div>
-              <Button disabled={!selectedCourse} onClick={() => startCreate("phase")}>
-                <Plus size={16} />
-                Add Phase
-              </Button>
-            </div>
+      {showCourseForm ? (
+        <Card>
+          <div className="mb-5 border-b border-slate-100 pb-4">
+            <h2 className="text-lg font-semibold text-slate-950">{formMode.item ? "Edit Course" : "Create Course"}</h2>
+            <p className="mt-1 text-sm text-slate-500">Set the top-level subject details before building phases and modules.</p>
+          </div>
+          <CourseForm
+            form={courseForm}
+            onSubmit={(values) => saveCourse.mutate(values)}
+            saving={saveCourse.isPending}
+            submitLabel={formMode.item ? "Update Course" : "Create Course"}
+          />
+        </Card>
+      ) : (
+        <div className="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
+          <CurriculumNavigator
+            loading={loadingCourseTree}
+            selectedCourse={selectedCourse}
+            phases={phases}
+            selectedPhaseId={selectedPhaseId}
+            selectedModuleId={selectedModuleId}
+            onCreateCourse={() => startCreate("course")}
+            onAddPhase={() => startCreate("phase")}
+            onAddModule={(phase) => startCreate("module", { phaseId: phase.id })}
+            onSelectPhase={selectPhaseFromNavigator}
+            onSelectModule={selectModuleFromNavigator}
+          />
 
-            <div className="space-y-4 p-5">
-              {loadingCourseTree ? (
-                <BuilderEmptyState title="Loading curriculum" description="Loading the selected course structure." />
-              ) : null}
-
-              {!loadingCourseTree && !selectedCourse ? (
+          <div className="min-w-0 space-y-6">
+            {loadingCourseTree ? (
+              <Card>
+                <BuilderEmptyState title="Loading course" description="Loading the selected course structure." />
+              </Card>
+            ) : !selectedCourse ? (
+              <Card>
                 <BuilderEmptyState
                   title="Create or select a course"
                   description="A course is the top-level subject container. After that, the curriculum builder appears here."
@@ -510,238 +538,470 @@ export function LearningPathPage() {
                     </Button>
                   }
                 />
-              ) : null}
+              </Card>
+            ) : (
+              <>
+                <CourseSettingsPanel
+                  course={selectedCourse}
+                  stats={courseStats}
+                  onEdit={() => startEdit("course", selectedCourse)}
+                  onDelete={() => confirmDelete("course", selectedCourse.id, selectedCourse.name)}
+                />
 
-              {!loadingCourseTree && selectedCourse && formMode.type === "phase" && !formMode.item ? (
-                <InlineFormPanel title="Create Phase" onCancel={closeForm}>
-                  <PhaseForm form={phaseForm} onSubmit={(values) => savePhase.mutate(values)} saving={savePhase.isPending} />
+                <PhaseWorkspace
+                  selectedPhase={selectedPhase}
+                  selectedModule={selectedModule}
+                  formMode={formMode}
+                  phaseForm={phaseForm}
+                  moduleForm={moduleForm}
+                  materialForm={materialForm}
+                  assessmentForm={assessmentForm}
+                  saving={{
+                    phase: savePhase.isPending,
+                    module: saveModule.isPending,
+                    material: saveMaterial.isPending,
+                    assessment: saveAssessment.isPending,
+                  }}
+                  onCloseForm={closeForm}
+                  onAddPhase={() => startCreate("phase")}
+                  onEditPhase={(phase) => startEdit("phase", phase)}
+                  onDeletePhase={(phase) => confirmDelete("phase", phase.id, phase.title)}
+                  onAddModule={(phase) => startCreate("module", { phaseId: phase.id })}
+                  onEditModule={(phase, courseModule) => startEdit("module", courseModule, { phaseId: phase.id })}
+                  onDeleteModule={(courseModule) => confirmDelete("module", courseModule.id, courseModule.title)}
+                  onAddMaterial={(phase, courseModule) => startCreate("material", { phaseId: phase.id, moduleId: courseModule.id })}
+                  onEditMaterial={(courseModule, material) => startEdit("material", material, { moduleId: courseModule.id })}
+                  onDeleteMaterial={(material) => confirmDelete("material", material.id, material.title)}
+                  onDeleteAssessment={(assessment) => confirmDelete("assessment", assessment.id, assessment.title)}
+                  onSavePhase={(values) => savePhase.mutate(values)}
+                  onSaveModule={(values) => saveModule.mutate(values)}
+                  onSaveMaterial={(values) => saveMaterial.mutate(values)}
+                  onSaveAssessment={(values) => saveAssessment.mutate(values)}
+                />
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CurriculumNavigator({
+  loading,
+  selectedCourse,
+  phases,
+  selectedPhaseId,
+  selectedModuleId,
+  onCreateCourse,
+  onAddPhase,
+  onAddModule,
+  onSelectPhase,
+  onSelectModule,
+}) {
+  return (
+    <Card className="p-0 xl:sticky xl:top-24 xl:self-start">
+      <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Curriculum</p>
+          <h2 className="mt-1 text-base font-semibold text-slate-950">Navigator</h2>
+          <p className="mt-1 text-sm text-slate-500">Use phases and modules like a course sidebar.</p>
+        </div>
+        <Button className="h-9 px-3" disabled={!selectedCourse} onClick={onAddPhase}>
+          <Plus size={15} />
+          Phase
+        </Button>
+      </div>
+
+      <div className="max-h-[calc(100vh-14rem)] overflow-y-auto p-3">
+        {loading ? (
+          <BuilderEmptyState title="Loading" description="Fetching curriculum." />
+        ) : !selectedCourse ? (
+          <BuilderEmptyState
+            title="No course selected"
+            description="Create or select a course to start."
+            action={
+              <Button onClick={onCreateCourse}>
+                <Plus size={16} />
+                Course
+              </Button>
+            }
+          />
+        ) : !phases.length ? (
+          <BuilderEmptyState
+            title="No phases yet"
+            description="Add the first phase."
+            action={
+              <Button onClick={onAddPhase}>
+                <Plus size={16} />
+                Add Phase
+              </Button>
+            }
+          />
+        ) : (
+          <div className="space-y-3">
+            {phases.map((phase, phaseIndex) => (
+              <PhaseNavigatorItem
+                key={phase.id}
+                phase={phase}
+                index={phaseIndex}
+                selectedPhaseId={selectedPhaseId}
+                selectedModuleId={selectedModuleId}
+                onAddModule={() => onAddModule(phase)}
+                onSelectPhase={() => onSelectPhase(phase)}
+                onSelectModule={(courseModule) => onSelectModule(phase, courseModule)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function PhaseNavigatorItem({ phase, index, selectedPhaseId, selectedModuleId, onAddModule, onSelectPhase, onSelectModule }) {
+  const selected = selectedPhaseId === phase.id;
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white/70 p-2">
+      <button
+        type="button"
+        className={cn(
+          "flex w-full items-start gap-3 rounded-lg p-2 text-left transition",
+          selected ? "bg-blue-50 text-blue-700" : "hover:bg-slate-50",
+        )}
+        onClick={onSelectPhase}
+      >
+        <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg text-sm font-semibold", selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700")}>
+          {index + 1}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 text-sm font-semibold text-slate-950">{phase.title}</span>
+          <span className="mt-1 block text-xs text-slate-500">{phase.modules?.length || 0} modules</span>
+        </span>
+      </button>
+
+      {selected ? (
+        <div className="mt-2 space-y-1 pl-3">
+          {(phase.modules || []).map((courseModule) => (
+            <button
+              key={courseModule.id}
+              type="button"
+              className={cn(
+                "flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left text-sm transition",
+                selectedModuleId === courseModule.id ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-100",
+              )}
+              onClick={() => onSelectModule(courseModule)}
+            >
+              <BookOpen size={15} className="mt-0.5 shrink-0" />
+              <span className="min-w-0 flex-1">
+                <span className="line-clamp-2 font-medium">{courseModule.title}</span>
+                <span className={cn("mt-1 block text-xs", selectedModuleId === courseModule.id ? "text-slate-300" : "text-slate-500")}>
+                  {courseModule.learningMaterials?.length || 0} materials / {courseModule.assessment ? "assessment" : "no assessment"}
+                </span>
+              </span>
+              {selectedModuleId === courseModule.id ? <CheckCircle2 size={15} className="shrink-0" /> : null}
+            </button>
+          ))}
+
+          <Button variant="ghost" className="h-9 w-full justify-start px-2 text-sm" onClick={onAddModule}>
+            <Plus size={15} />
+            Add Module
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CourseSettingsPanel({ course, stats, onEdit, onDelete }) {
+  return (
+    <Card className="p-5">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Settings size={18} className="text-blue-700" />
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Course Settings</p>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <h2 className="text-xl font-semibold text-slate-950">{course.name}</h2>
+            <StatusBadge value={course.isActive ? "ACTIVE" : "INACTIVE"} />
+          </div>
+          {course.description ? <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-500">{course.description}</p> : null}
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-[repeat(3,6rem)_auto_auto] sm:items-stretch">
+          <MiniStat label="Phases" value={stats.phases} />
+          <MiniStat label="Modules" value={stats.modules} />
+          <MiniStat label="Materials" value={stats.materials} />
+          <Button variant="secondary" className="h-full min-h-10 px-3" onClick={onEdit}>
+            <Edit2 size={16} />
+            Edit
+          </Button>
+          <Button variant="danger" className="h-full min-h-10 px-3" onClick={onDelete}>
+            <Trash2 size={16} />
+            Delete
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function PhaseWorkspace({
+  selectedPhase,
+  selectedModule,
+  formMode,
+  phaseForm,
+  moduleForm,
+  materialForm,
+  assessmentForm,
+  saving,
+  onCloseForm,
+  onAddPhase,
+  onEditPhase,
+  onDeletePhase,
+  onAddModule,
+  onEditModule,
+  onDeleteModule,
+  onAddMaterial,
+  onEditMaterial,
+  onDeleteMaterial,
+  onDeleteAssessment,
+  onSavePhase,
+  onSaveModule,
+  onSaveMaterial,
+  onSaveAssessment,
+}) {
+  const creatingPhase = formMode.type === "phase" && !formMode.item;
+  const editingPhase = selectedPhase && formMode.type === "phase" && formMode.item?.id === selectedPhase.id;
+  const creatingModule = selectedPhase && formMode.type === "module" && !formMode.item && formMode.phaseId === selectedPhase.id;
+
+  return (
+    <div className="space-y-6">
+      {creatingPhase ? (
+        <Card>
+          <InlineFormPanel title="Create Phase" onCancel={onCloseForm}>
+            <PhaseForm form={phaseForm} onSubmit={onSavePhase} saving={saving.phase} />
+          </InlineFormPanel>
+        </Card>
+      ) : null}
+
+      {!selectedPhase && !creatingPhase ? (
+        <Card>
+          <BuilderEmptyState
+            title="No phase selected"
+            description="Add or select a phase from the navigator."
+            action={
+              <Button onClick={onAddPhase}>
+                <Plus size={16} />
+                Add Phase
+              </Button>
+            }
+          />
+        </Card>
+      ) : null}
+
+      {selectedPhase ? (
+        <>
+          <Card className="p-0">
+            <div className="flex flex-col gap-4 border-b border-slate-200 p-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Layers size={18} className="text-blue-700" />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Selected Phase</p>
+                </div>
+                <h2 className="mt-2 text-xl font-semibold text-slate-950">{selectedPhase.title}</h2>
+                {selectedPhase.description ? <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-500">{selectedPhase.description}</p> : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => onAddModule(selectedPhase)}>
+                  <Plus size={16} />
+                  Module
+                </Button>
+                <Button variant="secondary" onClick={() => onEditPhase(selectedPhase)}>
+                  <Edit2 size={16} />
+                  Edit Phase
+                </Button>
+                <Button variant="danger" onClick={() => onDeletePhase(selectedPhase)}>
+                  <Trash2 size={16} />
+                  Delete
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-4 p-5">
+              {editingPhase ? (
+                <InlineFormPanel title="Edit Phase" onCancel={onCloseForm}>
+                  <PhaseForm form={phaseForm} onSubmit={onSavePhase} saving={saving.phase} />
                 </InlineFormPanel>
               ) : null}
 
-              {!loadingCourseTree && selectedCourse && !phases.length && formMode.type !== "phase" ? (
-                <BuilderEmptyState
-                  title="No phases yet"
-                  description="Add the first phase to start building the curriculum."
-                  action={
-                    <Button onClick={() => startCreate("phase")}>
-                      <Plus size={16} />
-                      Add Phase
-                    </Button>
-                  }
-                />
+              {creatingModule ? (
+                <InlineFormPanel title="Create Module" onCancel={onCloseForm}>
+                  <ModuleForm form={moduleForm} onSubmit={onSaveModule} saving={saving.module} />
+                </InlineFormPanel>
               ) : null}
-
-              {!loadingCourseTree && phases.map((phase) => {
-                const phaseOpen = selectedPhaseId === phase.id;
-                const showCreateModuleForm = formMode.type === "module" && !formMode.item && formMode.phaseId === phase.id;
-                const showEditPhaseForm = formMode.type === "phase" && formMode.item?.id === phase.id;
-
-                return (
-                  <PhaseBlock
-                    key={phase.id}
-                    phase={phase}
-                    open={phaseOpen}
-                    onToggle={() => {
-                      setSelectedPhaseId(phase.id);
-                      setSelectedModuleId("");
-                    }}
-                    onAddModule={() => startCreate("module", { phaseId: phase.id })}
-                    onEdit={() => startEdit("phase", phase)}
-                    onDelete={() => confirmDelete("phase", phase.id, phase.title)}
-                  >
-                    {showEditPhaseForm ? (
-                      <InlineFormPanel title="Edit Phase" onCancel={closeForm}>
-                        <PhaseForm form={phaseForm} onSubmit={(values) => savePhase.mutate(values)} saving={savePhase.isPending} />
-                      </InlineFormPanel>
-                    ) : null}
-
-                    {showCreateModuleForm ? (
-                      <InlineFormPanel title="Create Module" onCancel={closeForm}>
-                        <ModuleForm form={moduleForm} onSubmit={(values) => saveModule.mutate(values)} saving={saveModule.isPending} />
-                      </InlineFormPanel>
-                    ) : null}
-
-                    {!phase.modules?.length && !showCreateModuleForm ? (
-                      <BuilderEmptyState
-                        title="No modules in this phase"
-                        description="Add a module to hold lessons, materials, and its assessment."
-                        action={
-                          <Button variant="secondary" onClick={() => startCreate("module", { phaseId: phase.id })}>
-                            <Plus size={16} />
-                            Add Module
-                          </Button>
-                        }
-                      />
-                    ) : null}
-
-                    <div className="space-y-3">
-                      {(phase.modules || []).map((courseModule) => {
-                        const moduleOpen = selectedModuleId === courseModule.id;
-                        const showEditModuleForm = formMode.type === "module" && formMode.item?.id === courseModule.id;
-                        const showMaterialForm = formMode.type === "material" && (formMode.moduleId || selectedModuleId) === courseModule.id;
-
-                        return (
-                          <ModuleRow
-                            key={courseModule.id}
-                            courseModule={courseModule}
-                            open={moduleOpen}
-                            onToggle={() => {
-                              setSelectedPhaseId(phase.id);
-                              setSelectedModuleId(courseModule.id);
-                            }}
-                            onAddMaterial={() => startCreate("material", { phaseId: phase.id, moduleId: courseModule.id })}
-                            onEdit={() => startEdit("module", courseModule, { phaseId: phase.id })}
-                            onDelete={() => confirmDelete("module", courseModule.id, courseModule.title)}
-                          >
-                            {showEditModuleForm ? (
-                              <InlineFormPanel title="Edit Module" onCancel={closeForm}>
-                                <ModuleForm form={moduleForm} onSubmit={(values) => saveModule.mutate(values)} saving={saveModule.isPending} />
-                              </InlineFormPanel>
-                            ) : null}
-
-                            <div className="grid gap-5 2xl:grid-cols-[1fr_360px]">
-                              <section className="space-y-3">
-                                <div className="flex items-center justify-between gap-3">
-                                  <div className="flex items-center gap-2">
-                                    <FileText size={17} className="text-blue-700" />
-                                    <h3 className="font-semibold text-slate-950">Learning Materials</h3>
-                                  </div>
-                                  <Button
-                                    variant="secondary"
-                                    className="h-9 px-3"
-                                    onClick={() => startCreate("material", { phaseId: phase.id, moduleId: courseModule.id })}
-                                  >
-                                    <Plus size={15} />
-                                    Add Material
-                                  </Button>
-                                </div>
-
-                                {showMaterialForm ? (
-                                  <InlineFormPanel title={formMode.item ? "Edit Material" : "Create Material"} onCancel={closeForm}>
-                                    <MaterialForm
-                                      form={materialForm}
-                                      onSubmit={(values) => saveMaterial.mutate(values)}
-                                      saving={saveMaterial.isPending}
-                                    />
-                                  </InlineFormPanel>
-                                ) : null}
-
-                                {(courseModule.learningMaterials || []).length ? (
-                                  <div className="space-y-2">
-                                    {(courseModule.learningMaterials || []).map((material) => (
-                                      <MaterialRow
-                                        key={material.id}
-                                        material={material}
-                                        onEdit={() => startEdit("material", material, { moduleId: courseModule.id })}
-                                        onDelete={() => confirmDelete("material", material.id, material.title)}
-                                      />
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <BuilderEmptyState title="No materials yet" description="Add a video, article, PDF, link, or code resource." />
-                                )}
-                              </section>
-
-                              <section className="space-y-3">
-                                <div className="flex items-center gap-2">
-                                  <ClipboardList size={17} className="text-blue-700" />
-                                  <h3 className="font-semibold text-slate-950">Assessment</h3>
-                                </div>
-                                <AssessmentSummary
-                                  assessment={courseModule.assessment}
-                                  onDelete={() => confirmDelete("assessment", courseModule.assessment.id, courseModule.assessment.title)}
-                                />
-                                {moduleOpen ? (
-                                  <AssessmentForm
-                                    form={assessmentForm}
-                                    onSubmit={(values) => saveAssessment.mutate(values)}
-                                    saving={saveAssessment.isPending}
-                                    submitLabel={courseModule.assessment ? "Update Assessment" : "Attach Assessment"}
-                                  />
-                                ) : null}
-                              </section>
-                            </div>
-                          </ModuleRow>
-                        );
-                      })}
-                    </div>
-                  </PhaseBlock>
-                );
-              })}
             </div>
           </Card>
-        </div>
 
-        <aside className="space-y-5">
-          <Card className="p-5">
-            <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-4">
-              <Settings size={18} className="text-blue-700" />
-              <div>
-                <h2 className="font-semibold text-slate-950">Course Settings</h2>
-                <p className="text-sm text-slate-500">Manage the selected course.</p>
-              </div>
-            </div>
-
-            {showCourseForm ? (
-              <CourseForm
-                form={courseForm}
-                onSubmit={(values) => saveCourse.mutate(values)}
-                saving={saveCourse.isPending}
-                submitLabel={formMode.item ? "Update Course" : "Create Course"}
-              />
-            ) : loadingCourseTree ? (
-              <BuilderEmptyState title="Loading course settings" description="Loading the selected course details." />
-            ) : selectedCourse ? (
-              <div className="space-y-4">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-lg font-semibold text-slate-950">{selectedCourse.name}</h3>
-                    <StatusBadge value={selectedCourse.isActive ? "ACTIVE" : "INACTIVE"} />
-                  </div>
-                  {selectedCourse.description ? <p className="mt-2 text-sm text-slate-500">{selectedCourse.description}</p> : null}
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-md border border-slate-200 p-3">
-                    <p className="text-lg font-semibold text-slate-950">{courseStats.phases}</p>
-                    <p className="text-xs text-slate-500">Phases</p>
-                  </div>
-                  <div className="rounded-md border border-slate-200 p-3">
-                    <p className="text-lg font-semibold text-slate-950">{courseStats.modules}</p>
-                    <p className="text-xs text-slate-500">Modules</p>
-                  </div>
-                  <div className="rounded-md border border-slate-200 p-3">
-                    <p className="text-lg font-semibold text-slate-950">{courseStats.materials}</p>
-                    <p className="text-xs text-slate-500">Materials</p>
-                  </div>
-                </div>
-
-                <div className="grid gap-2">
-                  <Button variant="secondary" onClick={() => startEdit("course", selectedCourse)}>
-                    <Settings size={16} />
-                    Edit Course
-                  </Button>
-                  <Button variant="danger" onClick={() => confirmDelete("course", selectedCourse.id, selectedCourse.name)}>
-                    <Trash2 size={16} />
-                    Delete Course
-                  </Button>
-                </div>
-              </div>
-            ) : (
+          {selectedModule ? (
+            <ModuleDetailPanel
+              phase={selectedPhase}
+              courseModule={selectedModule}
+              formMode={formMode}
+              moduleForm={moduleForm}
+              materialForm={materialForm}
+              assessmentForm={assessmentForm}
+              saving={saving}
+              onCloseForm={onCloseForm}
+              onEditModule={() => onEditModule(selectedPhase, selectedModule)}
+              onDeleteModule={() => onDeleteModule(selectedModule)}
+              onAddMaterial={() => onAddMaterial(selectedPhase, selectedModule)}
+              onEditMaterial={(material) => onEditMaterial(selectedModule, material)}
+              onDeleteMaterial={onDeleteMaterial}
+              onDeleteAssessment={onDeleteAssessment}
+              onSaveModule={onSaveModule}
+              onSaveMaterial={onSaveMaterial}
+              onSaveAssessment={onSaveAssessment}
+            />
+          ) : (
+            <Card>
               <BuilderEmptyState
-                title="No course selected"
-                description="Create a course to start adding phases and modules."
+                title="No modules in this phase"
+                description="Create a module to hold learning materials and its assessment."
                 action={
-                  <Button onClick={() => startCreate("course")}>
+                  <Button onClick={() => onAddModule(selectedPhase)}>
                     <Plus size={16} />
-                    Create Course
+                    Add Module
                   </Button>
                 }
               />
-            )}
-          </Card>
-        </aside>
+            </Card>
+          )}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function ModuleDetailPanel({
+  courseModule,
+  formMode,
+  moduleForm,
+  materialForm,
+  assessmentForm,
+  saving,
+  onCloseForm,
+  onEditModule,
+  onDeleteModule,
+  onAddMaterial,
+  onEditMaterial,
+  onDeleteMaterial,
+  onDeleteAssessment,
+  onSaveModule,
+  onSaveMaterial,
+  onSaveAssessment,
+}) {
+  const editingModule = formMode.type === "module" && formMode.item?.id === courseModule.id;
+  const showMaterialForm = formMode.type === "material" && (formMode.moduleId || courseModule.id) === courseModule.id;
+
+  return (
+    <Card className="p-0">
+      <div className="flex flex-col gap-4 border-b border-slate-200 p-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <BookOpen size={18} className="text-blue-700" />
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Selected Module</p>
+          </div>
+          <h2 className="mt-2 text-xl font-semibold text-slate-950">{courseModule.title}</h2>
+          {courseModule.description ? <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-500">{courseModule.description}</p> : null}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={onAddMaterial}>
+            <Plus size={16} />
+            Material
+          </Button>
+          <Button variant="secondary" onClick={onEditModule}>
+            <Edit2 size={16} />
+            Edit Module
+          </Button>
+          <Button variant="danger" onClick={onDeleteModule}>
+            <Trash2 size={16} />
+            Delete
+          </Button>
+        </div>
       </div>
+
+      <div className="space-y-5 p-5">
+        {editingModule ? (
+          <InlineFormPanel title="Edit Module" onCancel={onCloseForm}>
+            <ModuleForm form={moduleForm} onSubmit={onSaveModule} saving={saving.module} />
+          </InlineFormPanel>
+        ) : null}
+
+        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_28rem]">
+          <section className="min-w-0 space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <FileText size={17} className="text-blue-700" />
+                <h3 className="font-semibold text-slate-950">Learning Materials</h3>
+              </div>
+              <Button variant="secondary" className="h-9 px-3" onClick={onAddMaterial}>
+                <Plus size={15} />
+                Add Material
+              </Button>
+            </div>
+
+            {showMaterialForm ? (
+              <InlineFormPanel title={formMode.item ? "Edit Material" : "Create Material"} onCancel={onCloseForm}>
+                <MaterialForm form={materialForm} onSubmit={onSaveMaterial} saving={saving.material} />
+              </InlineFormPanel>
+            ) : null}
+
+            {(courseModule.learningMaterials || []).length ? (
+              <div className="space-y-2">
+                {(courseModule.learningMaterials || []).map((material) => (
+                  <MaterialRow
+                    key={material.id}
+                    material={material}
+                    onEdit={() => onEditMaterial(material)}
+                    onDelete={() => onDeleteMaterial(material)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <BuilderEmptyState title="No materials yet" description="Add a video, article, PDF, link, or code resource." />
+            )}
+          </section>
+
+          <section className="min-w-0 space-y-3">
+            <div className="flex items-center gap-2">
+              <ClipboardList size={17} className="text-blue-700" />
+              <h3 className="font-semibold text-slate-950">Assessment</h3>
+            </div>
+            <AssessmentSummary
+              assessment={courseModule.assessment}
+              onDelete={() => onDeleteAssessment(courseModule.assessment)}
+            />
+            <AssessmentForm
+              form={assessmentForm}
+              onSubmit={onSaveAssessment}
+              saving={saving.assessment}
+              submitLabel={courseModule.assessment ? "Update Assessment" : "Attach Assessment"}
+            />
+          </section>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function MiniStat({ label, value }) {
+  return (
+    <div className="rounded-xl border border-slate-200 px-3 py-2 text-center">
+      <p className="text-lg font-semibold text-slate-950">{value}</p>
+      <p className="text-xs text-slate-500">{label}</p>
     </div>
   );
 }

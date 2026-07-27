@@ -4,6 +4,8 @@ import {
   ArrowLeft,
   BookOpen,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Circle,
   Clock3,
   ExternalLink,
@@ -86,6 +88,7 @@ export function StudentModulesPage() {
   const queryClient = useQueryClient();
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [selectedPhaseId, setSelectedPhaseId] = useState("");
+  const [selectedModuleId, setSelectedModuleId] = useState("");
 
   const dashboard = useQuery({
     queryKey: queryKeys.studentDashboard,
@@ -114,14 +117,27 @@ export function StudentModulesPage() {
     if (selectedSubjectId && !subjects.some((subject) => subject.id === selectedSubjectId)) {
       setSelectedSubjectId("");
       setSelectedPhaseId("");
+      setSelectedModuleId("");
     }
   }, [selectedSubjectId, subjects]);
 
   useEffect(() => {
     if (selectedPhaseId && !selectedSubject?.phases?.some((phase) => phase.id === selectedPhaseId)) {
       setSelectedPhaseId("");
+      setSelectedModuleId("");
     }
   }, [selectedPhaseId, selectedSubject]);
+
+  useEffect(() => {
+    if (!selectedPhase) {
+      if (selectedModuleId) setSelectedModuleId("");
+      return;
+    }
+
+    const modules = selectedPhase.modules || [];
+    const selectedStillExists = selectedModuleId && modules.some((courseModule) => courseModule.id === selectedModuleId);
+    if (!selectedStillExists) setSelectedModuleId(modules[0]?.id || "");
+  }, [selectedModuleId, selectedPhase]);
 
   async function markModule(courseModule, status) {
     const materials = courseModule.learningMaterials || [];
@@ -179,7 +195,14 @@ export function StudentModulesPage() {
           title={selectedSubject.name}
           description="Choose a phase. Each phase is treated like a separate learning step."
           action={
-            <Button variant="secondary" onClick={() => setSelectedSubjectId("")}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSelectedSubjectId("");
+                setSelectedPhaseId("");
+                setSelectedModuleId("");
+              }}
+            >
               <ArrowLeft size={16} />
               Subjects
             </Button>
@@ -207,33 +230,38 @@ export function StudentModulesPage() {
         description="Work through only this phase's modules, then move to the next phase when ready."
         action={
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => setSelectedPhaseId("")}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSelectedPhaseId("");
+                setSelectedModuleId("");
+              }}
+            >
               <ArrowLeft size={16} />
               Phases
             </Button>
-            <Button variant="secondary" onClick={() => setSelectedSubjectId("")}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSelectedSubjectId("");
+                setSelectedPhaseId("");
+                setSelectedModuleId("");
+              }}
+            >
               Subjects
             </Button>
           </div>
         }
       />
       <PhaseOverview subject={selectedSubject} phase={selectedPhase} />
-      <div className="grid gap-4">
-        {selectedPhase.modules.map((courseModule) => (
-          <ModulePanel
-            key={courseModule.id}
-            courseModule={courseModule}
-            saving={updateStatus.isPending}
-            onModuleStatus={(status) => markModule(courseModule, status)}
-            onMaterialStatus={updateMaterial}
-          />
-        ))}
-        {!selectedPhase.modules.length ? (
-          <Card>
-            <EmptyState title="No modules yet" description="Your instructor is still building this phase." />
-          </Card>
-        ) : null}
-      </div>
+      <ModuleLearningWorkspace
+        modules={selectedPhase.modules || []}
+        selectedModuleId={selectedModuleId}
+        saving={updateStatus.isPending}
+        onSelectModule={setSelectedModuleId}
+        onModuleStatus={markModule}
+        onMaterialStatus={updateMaterial}
+      />
     </div>
   );
 }
@@ -317,6 +345,117 @@ function PhaseOverview({ subject, phase }) {
         <ProgressBar value={percent} label="Phase progress" />
       </div>
     </Card>
+  );
+}
+
+function ModuleLearningWorkspace({ modules, selectedModuleId, saving, onSelectModule, onModuleStatus, onMaterialStatus }) {
+  const selectedIndex = Math.max(0, modules.findIndex((courseModule) => courseModule.id === selectedModuleId));
+  const selectedModule = modules[selectedIndex] || modules[0] || null;
+
+  if (!modules.length) {
+    return (
+      <Card>
+        <EmptyState title="No modules yet" description="Your instructor is still building this phase." />
+      </Card>
+    );
+  }
+
+  function selectOffset(offset) {
+    const nextIndex = selectedIndex + offset;
+    const nextModule = modules[nextIndex];
+    if (nextModule) onSelectModule(nextModule.id);
+  }
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[20rem_minmax(0,1fr)]">
+      <Card className="p-0 xl:sticky xl:top-24 xl:self-start">
+        <div className="border-b border-slate-200 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Phase Modules</p>
+          <h2 className="mt-1 text-base font-semibold text-slate-950">{modules.length} modules</h2>
+          <p className="mt-1 text-sm text-slate-500">Select a module to study. Only the selected module opens here.</p>
+        </div>
+        <div className="flex gap-2 overflow-x-auto p-3 xl:block xl:max-h-[calc(100vh-16rem)] xl:space-y-2 xl:overflow-y-auto xl:overflow-x-hidden">
+          {modules.map((courseModule, index) => (
+            <ModuleNavItem
+              key={courseModule.id}
+              courseModule={courseModule}
+              index={index}
+              selected={courseModule.id === selectedModule?.id}
+              onSelect={() => onSelectModule(courseModule.id)}
+            />
+          ))}
+        </div>
+      </Card>
+
+      <div className="min-w-0 space-y-4">
+        <Card className="p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Module {selectedIndex + 1} of {modules.length}
+              </p>
+              <h2 className="mt-1 truncate text-lg font-semibold text-slate-950">{selectedModule.title}</h2>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="secondary" className="h-9 px-3" disabled={selectedIndex <= 0} onClick={() => selectOffset(-1)}>
+                <ChevronLeft size={16} />
+                Previous
+              </Button>
+              <Button variant="secondary" className="h-9 px-3" disabled={selectedIndex >= modules.length - 1} onClick={() => selectOffset(1)}>
+                Next
+                <ChevronRight size={16} />
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <ModulePanel
+          courseModule={selectedModule}
+          saving={saving}
+          onModuleStatus={(status) => onModuleStatus(selectedModule, status)}
+          onMaterialStatus={onMaterialStatus}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ModuleNavItem({ courseModule, index, selected, onSelect }) {
+  const progress = getModuleProgress(courseModule);
+  const percent = Math.max(0, Math.min(100, Math.round(Number(progress.completionPercent) || 0)));
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        "min-w-[16rem] rounded-xl border p-3 text-left transition xl:min-w-0 xl:w-full",
+        selected
+          ? "border-blue-300 bg-blue-50 shadow-sm"
+          : "border-slate-200 bg-white/70 hover:border-slate-300 hover:bg-slate-50",
+      )}
+      onClick={onSelect}
+    >
+      <div className="flex items-start gap-3">
+        <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg text-sm font-semibold", selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700")}>
+          {index + 1}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 text-sm font-semibold text-slate-950">{courseModule.title}</span>
+          <span className="mt-1 block text-xs text-slate-500">
+            {courseModule.learningMaterials?.length || 0} materials / {courseModule.assessment ? "assessment" : "no assessment"}
+          </span>
+        </span>
+      </div>
+      <div className="mt-3">
+        <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-500">
+          <span>{progress.status.replaceAll("_", " ")}</span>
+          <span className="font-semibold text-slate-700">{percent}%</span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+          <span className="block h-full rounded-full bg-blue-600" style={{ width: `${percent}%` }} />
+        </div>
+      </div>
+    </button>
   );
 }
 
