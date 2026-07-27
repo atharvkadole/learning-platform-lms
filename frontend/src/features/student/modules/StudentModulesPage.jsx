@@ -12,6 +12,7 @@ import {
   FileQuestion,
   Layers,
   PlayCircle,
+  X,
 } from "lucide-react";
 import { Link } from "react-router";
 import { toast } from "sonner";
@@ -82,6 +83,12 @@ function getAssessmentSummary(assessment) {
     questionCount: assessment._count?.questions || 0,
     status: latestAttempt?.status || "NOT_STARTED",
   };
+}
+
+function compactText(value, limit = 220) {
+  const normalized = String(value || "").replace(/\s+/g, " ").trim();
+  if (normalized.length <= limit) return normalized;
+  return `${normalized.slice(0, limit).trim()}...`;
 }
 
 export function StudentModulesPage() {
@@ -280,7 +287,7 @@ function SubjectCard({ subject, onSelect }) {
         <StatusBadge value={status} />
       </div>
       <h2 className="mt-4 text-lg font-semibold text-slate-950">{subject.name}</h2>
-      {subject.description ? <p className="mt-1 line-clamp-2 text-sm text-slate-500">{subject.description}</p> : null}
+          {subject.description ? <p className="mt-1 text-sm text-slate-500">{compactText(subject.description, 160)}</p> : null}
       <ProgressBar value={percent} label="Subject progress" className="mt-5" />
       <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
         <InfoStat label="Phases" value={subject.phases.length} />
@@ -300,7 +307,7 @@ function SubjectOverview({ subject }) {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Selected Subject</p>
           <h2 className="mt-1 text-xl font-semibold text-slate-950">{subject.name}</h2>
-          {subject.description ? <p className="mt-1 text-sm text-slate-500">{subject.description}</p> : null}
+          {subject.description ? <p className="mt-1 text-sm text-slate-500">{compactText(subject.description, 220)}</p> : null}
         </div>
         <ProgressBar value={percent} label="Subject progress" />
       </div>
@@ -321,7 +328,7 @@ function PhaseCard({ phase, onSelect }) {
         <StatusBadge value={status} />
       </div>
       <h2 className="mt-4 text-lg font-semibold text-slate-950">{phase.title}</h2>
-      {phase.description ? <p className="mt-1 line-clamp-2 text-sm text-slate-500">{phase.description}</p> : null}
+      {phase.description ? <p className="mt-1 text-sm text-slate-500">{compactText(phase.description, 180)}</p> : null}
       <ProgressBar value={percent} label="Phase progress" className="mt-5" />
       <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
         <InfoStat label="Modules" value={phase.modules?.length || 0} />
@@ -340,7 +347,7 @@ function PhaseOverview({ subject, phase }) {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{subject.name}</p>
           <h2 className="mt-1 text-xl font-semibold text-slate-950">{phase.title}</h2>
-          {phase.description ? <p className="mt-1 text-sm text-slate-500">{phase.description}</p> : null}
+          {phase.description ? <p className="mt-1 text-sm text-slate-500">{compactText(phase.description, 260)}</p> : null}
         </div>
         <ProgressBar value={percent} label="Phase progress" />
       </div>
@@ -464,6 +471,7 @@ function ModulePanel({ courseModule, saving, onModuleStatus, onMaterialStatus })
   const assessment = getAssessmentSummary(courseModule.assessment);
   const materials = useMemo(() => courseModule.learningMaterials || [], [courseModule.learningMaterials]);
   const [selectedMaterialId, setSelectedMaterialId] = useState("");
+  const [readerMaterial, setReaderMaterial] = useState(null);
   const selectedMaterial = useMemo(
     () => materials.find((material) => material.id === selectedMaterialId) || materials[0] || null,
     [materials, selectedMaterialId],
@@ -479,7 +487,14 @@ function ModulePanel({ courseModule, saving, onModuleStatus, onMaterialStatus })
     if (!selectedStillExists) setSelectedMaterialId(materials[0].id);
   }, [courseModule.id, materials, selectedMaterialId]);
 
+  useEffect(() => {
+    if (readerMaterial && !materials.some((material) => material.id === readerMaterial.id)) {
+      setReaderMaterial(null);
+    }
+  }, [materials, readerMaterial]);
+
   return (
+    <>
     <article className="lms-panel rounded-2xl border p-4">
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0">
@@ -487,7 +502,7 @@ function ModulePanel({ courseModule, saving, onModuleStatus, onMaterialStatus })
             <h3 className="truncate text-lg font-semibold text-slate-950">{courseModule.title}</h3>
             <StatusBadge value={progress.status} />
           </div>
-          {courseModule.description ? <p className="mt-1 text-sm text-slate-500">{courseModule.description}</p> : null}
+          {courseModule.description ? <p className="mt-1 text-sm text-slate-500">{compactText(courseModule.description, 240)}</p> : null}
           <ProgressBar value={progress.completionPercent} label="Module progress" className="mt-4" />
           <div className="mt-4 flex flex-wrap gap-2">
             <Button
@@ -533,10 +548,11 @@ function ModulePanel({ courseModule, saving, onModuleStatus, onMaterialStatus })
             </div>
           </section>
 
-          <MaterialReader
+          <MaterialPreview
             material={selectedMaterial}
             saving={saving}
             onStatus={(status) => onMaterialStatus(selectedMaterial.id, status)}
+            onRead={() => setReaderMaterial(selectedMaterial)}
           />
         </div>
       ) : (
@@ -545,6 +561,15 @@ function ModulePanel({ courseModule, saving, onModuleStatus, onMaterialStatus })
         </div>
       )}
     </article>
+    {readerMaterial ? (
+      <LessonReaderModal
+        material={readerMaterial}
+        saving={saving}
+        onClose={() => setReaderMaterial(null)}
+        onStatus={(status) => onMaterialStatus(readerMaterial.id, status)}
+      />
+    ) : null}
+    </>
   );
 }
 
@@ -591,7 +616,7 @@ function AssessmentMiniCard({ assessment, summary }) {
 function MaterialCard({ material, index, selected, onSelect }) {
   const Icon = getMaterialIcon(material.type);
   const currentStatus = getMaterialStatus(material);
-  const preview = material.description?.trim();
+  const preview = compactText(material.description, 140);
 
   return (
     <button
@@ -608,14 +633,14 @@ function MaterialCard({ material, index, selected, onSelect }) {
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-start justify-between gap-2">
-            <span className="line-clamp-2 text-sm font-semibold text-slate-950">{material.title}</span>
+            <span className="text-sm font-semibold text-slate-950">{compactText(material.title, 72)}</span>
             <span className="shrink-0 text-xs font-semibold text-slate-500">{index + 1}</span>
           </span>
           <span className="mt-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
             {getMaterialTypeLabel(material.type)}
             {material.estimatedMinutes ? ` / ${material.estimatedMinutes} min` : ""}
           </span>
-          {preview ? <span className="mt-2 line-clamp-2 block text-xs leading-5 text-slate-500">{preview}</span> : null}
+          {preview ? <span className="mt-2 block text-xs leading-5 text-slate-500">{preview}</span> : null}
           <span className="mt-3 block">
             <StatusBadge value={currentStatus} />
           </span>
@@ -625,7 +650,7 @@ function MaterialCard({ material, index, selected, onSelect }) {
   );
 }
 
-function MaterialReader({ material, saving, onStatus }) {
+function MaterialPreview({ material, saving, onStatus, onRead }) {
   const Icon = getMaterialIcon(material.type);
   const openable = canOpenMaterial(material);
   const currentStatus = getMaterialStatus(material);
@@ -651,6 +676,12 @@ function MaterialReader({ material, saving, onStatus }) {
         </div>
 
         <div className="flex flex-wrap gap-2 xl:justify-end">
+          {content ? (
+            <Button className="h-9 px-3 text-xs" onClick={onRead}>
+              <BookOpen size={14} />
+              Read Lesson
+            </Button>
+          ) : null}
           {openable ? (
             <a
               className="focus-ring inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-xs font-medium text-slate-800 shadow-sm hover:bg-slate-50"
@@ -669,9 +700,9 @@ function MaterialReader({ material, saving, onStatus }) {
         </div>
       </div>
 
-      <div className="mt-4 max-h-[38rem] overflow-y-auto rounded-2xl border border-slate-200 bg-white/80 p-4">
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-white/80 p-4">
         {content ? (
-          <div className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">{content}</div>
+          <p className="text-sm leading-6 text-slate-600">{compactText(content, 380)}</p>
         ) : (
           <EmptyState title="No lesson text" description="Use the material link or ask the instructor to add lesson content." />
         )}
@@ -683,6 +714,69 @@ function MaterialReader({ material, saving, onStatus }) {
         </p>
       ) : null}
     </section>
+  );
+}
+
+function LessonReaderModal({ material, saving, onClose, onStatus }) {
+  const Icon = getMaterialIcon(material.type);
+  const openable = canOpenMaterial(material);
+  const currentStatus = getMaterialStatus(material);
+  const content = material.description?.trim();
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/70 p-3 backdrop-blur-sm sm:p-6">
+      <section className="mx-auto flex h-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex flex-col gap-4 border-b border-slate-200 p-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700">
+              <Icon size={20} />
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-semibold text-slate-950">{material.title}</h2>
+                <StatusBadge value={currentStatus} />
+              </div>
+              <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+                {getMaterialTypeLabel(material.type)}
+                {material.estimatedMinutes ? ` / ${material.estimatedMinutes} min` : ""}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            {openable ? (
+              <a
+                className="focus-ring inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-xs font-medium text-slate-800 shadow-sm hover:bg-slate-50"
+                href={material.contentUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  if (currentStatus === "NOT_STARTED") onStatus("IN_PROGRESS");
+                }}
+              >
+                <ExternalLink size={14} />
+                {getMaterialActionLabel(material.type)}
+              </a>
+            ) : null}
+            <MaterialStatusControl value={currentStatus} saving={saving} onChange={onStatus} />
+            <Button variant="secondary" className="h-9 px-3 text-xs" onClick={onClose}>
+              <X size={14} />
+              Close
+            </Button>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+          {content ? (
+            <div className="mx-auto max-w-3xl whitespace-pre-wrap break-words text-sm leading-7 text-slate-700 sm:text-base sm:leading-8">
+              {content}
+            </div>
+          ) : (
+            <EmptyState title="No lesson text" description="Use the material link or ask the instructor to add lesson content." />
+          )}
+        </div>
+      </section>
+    </div>
   );
 }
 
