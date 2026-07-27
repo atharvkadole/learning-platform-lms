@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { Button } from "../ui/Button.jsx";
 import { useAuth } from "../../lib/useAuth.js";
 import { cn } from "../../lib/utils.js";
@@ -45,8 +45,10 @@ export function AppLayout({ role }) {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("sidebar-collapsed") === "true";
   });
+  const location = useLocation();
   const navigate = useNavigate();
   const items = role === "ADMIN" ? adminItems : studentItems;
+  const workspaceMode = ["/admin/learning-path", "/student/modules"].some((path) => location.pathname.startsWith(path));
 
   async function handleLogout() {
     await logout();
@@ -62,25 +64,27 @@ export function AppLayout({ role }) {
 
   return (
     <div className="min-h-screen bg-[var(--surface-page)]">
-      <aside
-        className={cn(
-          "app-sidebar fixed inset-y-0 left-0 z-30 hidden border-r border-slate-200 backdrop-blur-xl transition-[width] duration-200 lg:block",
-          sidebarCollapsed ? "w-[5.25rem]" : "w-64",
-        )}
-      >
-        <div className={cn("flex h-20 items-center gap-3 border-b border-slate-200 px-4", sidebarCollapsed && "justify-center px-3")}>
-          <div className="grid size-11 place-items-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
-            <GraduationCap size={23} />
+      {!workspaceMode ? (
+        <aside
+          className={cn(
+            "app-sidebar fixed inset-y-0 left-0 z-30 hidden border-r border-slate-200 backdrop-blur-xl transition-[width] duration-200 lg:block",
+            sidebarCollapsed ? "w-[5.25rem]" : "w-64",
+          )}
+        >
+          <div className={cn("flex h-20 items-center gap-3 border-b border-slate-200 px-4", sidebarCollapsed && "justify-center px-3")}>
+            <div className="grid size-11 place-items-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
+              <GraduationCap size={23} />
+            </div>
+            <div className={cn("min-w-0", sidebarCollapsed && "hidden")}>
+              <p className="text-sm font-semibold text-slate-950">{branding.appName}</p>
+              <p className="text-xs text-slate-500">{roleLabel}</p>
+            </div>
           </div>
-          <div className={cn("min-w-0", sidebarCollapsed && "hidden")}>
-            <p className="text-sm font-semibold text-slate-950">{branding.appName}</p>
-            <p className="text-xs text-slate-500">{roleLabel}</p>
-          </div>
-        </div>
-        <SidebarNav items={items} collapsed={sidebarCollapsed} onNavigate={() => setMobileOpen(false)} />
-      </aside>
+          <SidebarNav items={items} collapsed={sidebarCollapsed} onNavigate={() => setMobileOpen(false)} />
+        </aside>
+      ) : null}
 
-      {mobileOpen ? (
+      {mobileOpen && !workspaceMode ? (
         <div className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)}>
           <aside
             className="app-sidebar h-full w-[min(20rem,calc(100vw-2rem))] border-r border-slate-200 p-3 shadow-2xl dark:border-slate-800"
@@ -105,20 +109,29 @@ export function AppLayout({ role }) {
         </div>
       ) : null}
 
-      <div className={cn("transition-[padding] duration-200", sidebarCollapsed ? "lg:pl-[5.25rem]" : "lg:pl-64")}>
+      <div
+        className={cn(
+          "transition-[padding] duration-200",
+          workspaceMode ? "lg:pl-0" : sidebarCollapsed ? "lg:pl-[5.25rem]" : "lg:pl-64",
+        )}
+      >
         <header className="app-header sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 px-4 backdrop-blur-xl dark:border-slate-800 sm:px-6 lg:h-20">
           <div className="flex min-w-0 items-center gap-3">
-            <Button variant="ghost" className="h-10 px-2 lg:hidden" aria-label="Open navigation" onClick={() => setMobileOpen(true)}>
-              <Menu size={20} />
-            </Button>
-            <Button
-              variant="ghost"
-              className="hidden h-10 px-2 lg:inline-flex"
-              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              onClick={() => setSidebarCollapsed((value) => !value)}
-            >
-              {sidebarCollapsed ? <PanelLeftOpen size={19} /> : <PanelLeftClose size={19} />}
-            </Button>
+            {!workspaceMode ? (
+              <>
+                <Button variant="ghost" className="h-10 px-2 lg:hidden" aria-label="Open navigation" onClick={() => setMobileOpen(true)}>
+                  <Menu size={20} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="hidden h-10 px-2 lg:inline-flex"
+                  aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  onClick={() => setSidebarCollapsed((value) => !value)}
+                >
+                  {sidebarCollapsed ? <PanelLeftOpen size={19} /> : <PanelLeftClose size={19} />}
+                </Button>
+              </>
+            ) : null}
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-slate-950">{userName || roleLabel}</p>
               <p className="truncate text-xs text-slate-500">{user?.email}</p>
@@ -135,7 +148,7 @@ export function AppLayout({ role }) {
             </Button>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1480px] p-4 sm:p-6 lg:p-8">
+        <main className={cn("mx-auto w-full p-4 sm:p-6", workspaceMode ? "max-w-none lg:p-5" : "max-w-[1480px] lg:p-8")}>
           <Outlet />
         </main>
       </div>
@@ -170,4 +183,3 @@ function SidebarNav({ items, collapsed = false, onNavigate }) {
     </nav>
   );
 }
-

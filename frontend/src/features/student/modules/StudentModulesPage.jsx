@@ -180,7 +180,19 @@ export function StudentModulesPage() {
   if (!selectedSubject) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Subjects" description="Choose the subject you want to learn. Each card shows your current completion." />
+        <PageHeader
+          title="Subjects"
+          description="Choose the subject you want to learn. Each card shows your current completion."
+          action={
+            <Link
+              to="/student/dashboard"
+              className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-slate-50"
+            >
+              <ArrowLeft size={16} />
+              Exit Learning
+            </Link>
+          }
+        />
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
           {subjects.map((subject) => (
             <SubjectCard key={subject.id} subject={subject} onSelect={() => setSelectedSubjectId(subject.id)} />
@@ -202,17 +214,26 @@ export function StudentModulesPage() {
           title={selectedSubject.name}
           description="Choose a phase. Each phase is treated like a separate learning step."
           action={
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setSelectedSubjectId("");
-                setSelectedPhaseId("");
-                setSelectedModuleId("");
-              }}
-            >
-              <ArrowLeft size={16} />
-              Subjects
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to="/student/dashboard"
+                className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-slate-50"
+              >
+                <ArrowLeft size={16} />
+                Exit
+              </Link>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSelectedSubjectId("");
+                  setSelectedPhaseId("");
+                  setSelectedModuleId("");
+                }}
+              >
+                <ArrowLeft size={16} />
+                Subjects
+              </Button>
+            </div>
           }
         />
         <SubjectOverview subject={selectedSubject} />
@@ -237,6 +258,13 @@ export function StudentModulesPage() {
         description="Work through only this phase's modules, then move to the next phase when ready."
         action={
           <div className="flex flex-wrap gap-2">
+            <Link
+              to="/student/dashboard"
+              className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-slate-50"
+            >
+              <ArrowLeft size={16} />
+              Exit
+            </Link>
             <Button
               variant="secondary"
               onClick={() => {
@@ -401,7 +429,7 @@ function ModuleLearningWorkspace({ modules, selectedModuleId, saving, onSelectMo
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Module {selectedIndex + 1} of {modules.length}
               </p>
-              <h2 className="mt-1 truncate text-lg font-semibold text-slate-950">{selectedModule.title}</h2>
+              <h2 className="mt-1 text-lg font-semibold leading-7 text-slate-950">{selectedModule.title}</h2>
             </div>
             <div className="flex gap-2">
               <Button variant="secondary" className="h-9 px-3" disabled={selectedIndex <= 0} onClick={() => selectOffset(-1)}>
@@ -470,22 +498,7 @@ function ModulePanel({ courseModule, saving, onModuleStatus, onMaterialStatus })
   const progress = getModuleProgress(courseModule);
   const assessment = getAssessmentSummary(courseModule.assessment);
   const materials = useMemo(() => courseModule.learningMaterials || [], [courseModule.learningMaterials]);
-  const [selectedMaterialId, setSelectedMaterialId] = useState("");
   const [readerMaterial, setReaderMaterial] = useState(null);
-  const selectedMaterial = useMemo(
-    () => materials.find((material) => material.id === selectedMaterialId) || materials[0] || null,
-    [materials, selectedMaterialId],
-  );
-
-  useEffect(() => {
-    if (!materials.length) {
-      if (selectedMaterialId) setSelectedMaterialId("");
-      return;
-    }
-
-    const selectedStillExists = selectedMaterialId && materials.some((material) => material.id === selectedMaterialId);
-    if (!selectedStillExists) setSelectedMaterialId(materials[0].id);
-  }, [courseModule.id, materials, selectedMaterialId]);
 
   useEffect(() => {
     if (readerMaterial && !materials.some((material) => material.id === readerMaterial.id)) {
@@ -499,10 +512,10 @@ function ModulePanel({ courseModule, saving, onModuleStatus, onMaterialStatus })
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-lg font-semibold text-slate-950">{courseModule.title}</h3>
+            <h3 className="text-lg font-semibold leading-7 text-slate-950">{courseModule.title}</h3>
             <StatusBadge value={progress.status} />
           </div>
-          {courseModule.description ? <p className="mt-1 text-sm text-slate-500">{compactText(courseModule.description, 240)}</p> : null}
+          {courseModule.description ? <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-500">{compactText(courseModule.description, 420)}</p> : null}
           <ProgressBar value={progress.completionPercent} label="Module progress" className="mt-4" />
           <div className="mt-4 flex flex-wrap gap-2">
             <Button
@@ -529,32 +542,24 @@ function ModulePanel({ courseModule, saving, onModuleStatus, onMaterialStatus })
       </div>
 
       {materials.length ? (
-        <div className="mt-4 grid gap-4 2xl:grid-cols-[22rem_minmax(0,1fr)]">
-          <section className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <h4 className="text-sm font-semibold text-slate-950">Materials</h4>
-              <span className="text-xs font-medium text-slate-500">{materials.length} items</span>
-            </div>
-            <div className="max-h-[30rem] space-y-2 overflow-y-auto pr-1">
-              {materials.map((material, index) => (
-                <MaterialCard
-                  key={material.id}
-                  index={index}
-                  material={material}
-                  selected={material.id === selectedMaterial?.id}
-                  onSelect={() => setSelectedMaterialId(material.id)}
-                />
-              ))}
-            </div>
-          </section>
-
-          <MaterialPreview
-            material={selectedMaterial}
-            saving={saving}
-            onStatus={(status) => onMaterialStatus(selectedMaterial.id, status)}
-            onRead={() => setReaderMaterial(selectedMaterial)}
-          />
-        </div>
+        <section className="mt-5 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="text-sm font-semibold text-slate-950">Materials</h4>
+            <span className="text-xs font-medium text-slate-500">{materials.length} items</span>
+          </div>
+          <div className="grid gap-3">
+            {materials.map((material, index) => (
+              <MaterialCard
+                key={material.id}
+                index={index}
+                material={material}
+                saving={saving}
+                onStatus={(status) => onMaterialStatus(material.id, status)}
+                onRead={() => setReaderMaterial(material)}
+              />
+            ))}
+          </div>
+        </section>
       ) : (
         <div className="mt-4">
           <EmptyState title="No materials yet" description="Your instructor has not added resources for this module." />
@@ -613,69 +618,40 @@ function AssessmentMiniCard({ assessment, summary }) {
   );
 }
 
-function MaterialCard({ material, index, selected, onSelect }) {
-  const Icon = getMaterialIcon(material.type);
-  const currentStatus = getMaterialStatus(material);
-  const preview = compactText(material.description, 140);
-
-  return (
-    <button
-      type="button"
-      className={cn(
-        "w-full rounded-xl border p-3 text-left transition",
-        selected ? "border-blue-300 bg-blue-50 shadow-sm" : "border-slate-200 bg-white/70 hover:border-slate-300 hover:bg-slate-50",
-      )}
-      onClick={onSelect}
-    >
-      <div className="flex min-w-0 items-start gap-3">
-        <span className={cn("grid size-9 shrink-0 place-items-center rounded-lg", selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700")}>
-          <Icon size={17} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex items-start justify-between gap-2">
-            <span className="text-sm font-semibold text-slate-950">{compactText(material.title, 72)}</span>
-            <span className="shrink-0 text-xs font-semibold text-slate-500">{index + 1}</span>
-          </span>
-          <span className="mt-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
-            {getMaterialTypeLabel(material.type)}
-            {material.estimatedMinutes ? ` / ${material.estimatedMinutes} min` : ""}
-          </span>
-          {preview ? <span className="mt-2 block text-xs leading-5 text-slate-500">{preview}</span> : null}
-          <span className="mt-3 block">
-            <StatusBadge value={currentStatus} />
-          </span>
-        </span>
-      </div>
-    </button>
-  );
-}
-
-function MaterialPreview({ material, saving, onStatus, onRead }) {
+function MaterialCard({ material, index, saving, onStatus, onRead }) {
   const Icon = getMaterialIcon(material.type);
   const openable = canOpenMaterial(material);
   const currentStatus = getMaterialStatus(material);
   const content = material.description?.trim();
+  const preview = compactText(content, 260);
 
   return (
-    <section className="lms-soft min-w-0 rounded-2xl border p-4">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+    <article className="lms-soft rounded-2xl border p-4">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700">
-            <Icon size={20} />
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700">
+            <Icon size={17} />
           </span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h4 className="text-base font-semibold text-slate-950">{material.title}</h4>
+              <span className="text-xs font-semibold text-slate-500">{index + 1}</span>
               <StatusBadge value={currentStatus} />
             </div>
+            <h5 className="mt-2 text-base font-semibold leading-6 text-slate-950">{material.title}</h5>
             <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
               {getMaterialTypeLabel(material.type)}
               {material.estimatedMinutes ? ` / ${material.estimatedMinutes} min` : ""}
             </p>
+            {preview ? <p className="mt-3 max-w-5xl text-sm leading-6 text-slate-500">{preview}</p> : null}
+            {!openable ? (
+              <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                This material does not have a link yet. You can still mark your learning status.
+              </p>
+            ) : null}
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 xl:justify-end">
+        <div className="flex flex-wrap gap-2 xl:max-w-xs xl:justify-end">
           {content ? (
             <Button className="h-9 px-3 text-xs" onClick={onRead}>
               <BookOpen size={14} />
@@ -699,21 +675,7 @@ function MaterialPreview({ material, saving, onStatus, onRead }) {
           <MaterialStatusControl value={currentStatus} saving={saving} onChange={onStatus} />
         </div>
       </div>
-
-      <div className="mt-4 rounded-2xl border border-slate-200 bg-white/80 p-4">
-        {content ? (
-          <p className="text-sm leading-6 text-slate-600">{compactText(content, 380)}</p>
-        ) : (
-          <EmptyState title="No lesson text" description="Use the material link or ask the instructor to add lesson content." />
-        )}
-      </div>
-
-      {!openable ? (
-        <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
-          This material does not have a link yet. You can still mark your learning status.
-        </p>
-      ) : null}
-    </section>
+    </article>
   );
 }
 

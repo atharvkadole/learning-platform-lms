@@ -1,14 +1,16 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, CheckCircle2, ClipboardList, Edit2, FileText, Layers, Plus, Settings, Trash2 } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, ClipboardList, Edit2, FileText, Layers, Plus, Settings, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
+import { Link } from "react-router";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "../../../components/ui/Button.jsx";
 import { Card } from "../../../components/ui/Card.jsx";
 import { StatusBadge } from "../../../components/ui/StatusBadge.jsx";
 import { api } from "../../../lib/api.js";
+import { cn } from "../../../lib/utils.js";
 import {
   AssessmentSummary,
   BuilderEmptyState,
@@ -55,6 +57,12 @@ const courseSchema = z.object({
   order: z.coerce.number().int(),
   isActive: z.boolean().default(true),
 });
+
+function compactText(value, limit = 520) {
+  const normalized = String(value || "").replace(/\s+/g, " ").trim();
+  if (normalized.length <= limit) return normalized;
+  return `${normalized.slice(0, limit).trim()}...`;
+}
 
 const phaseSchema = z.object({
   title: z.string().min(1, "Phase title is required"),
@@ -484,12 +492,21 @@ export function LearningPathPage() {
               Create the course, add phases, place modules inside each phase, then attach materials and assessments inside the module.
             </p>
           </div>
-          <CoursePicker
-            courses={courses.data || []}
-            selectedCourseId={selectedCourseId}
-            onSelect={selectCourse}
-            onCreate={() => startCreate("course")}
-          />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
+            <Link
+              to="/admin/dashboard"
+              className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-slate-50"
+            >
+              <ArrowLeft size={16} />
+              Exit Builder
+            </Link>
+            <CoursePicker
+              courses={courses.data || []}
+              selectedCourseId={selectedCourseId}
+              onSelect={selectCourse}
+              onCreate={() => startCreate("course")}
+            />
+          </div>
         </div>
       </Card>
 
@@ -507,7 +524,7 @@ export function LearningPathPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
+        <div className="grid gap-5 xl:grid-cols-[20rem_minmax(0,1fr)] 2xl:grid-cols-[21rem_minmax(0,1fr)]">
           <CurriculumNavigator
             loading={loadingCourseTree}
             selectedCourse={selectedCourse}
@@ -717,7 +734,7 @@ function PhaseNavigatorItem({ phase, index, selectedPhaseId, selectedModuleId, o
 function CourseSettingsPanel({ course, stats, onEdit, onDelete }) {
   return (
     <Card className="p-5">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+      <div className="space-y-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Settings size={18} className="text-blue-700" />
@@ -727,21 +744,25 @@ function CourseSettingsPanel({ course, stats, onEdit, onDelete }) {
             <h2 className="text-xl font-semibold text-slate-950">{course.name}</h2>
             <StatusBadge value={course.isActive ? "ACTIVE" : "INACTIVE"} />
           </div>
-          {course.description ? <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-500">{course.description}</p> : null}
+          {course.description ? <p className="mt-2 max-w-6xl text-sm leading-6 text-slate-500">{compactText(course.description, 520)}</p> : null}
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-[repeat(3,6rem)_auto_auto] sm:items-stretch">
-          <MiniStat label="Phases" value={stats.phases} />
-          <MiniStat label="Modules" value={stats.modules} />
-          <MiniStat label="Materials" value={stats.materials} />
-          <Button variant="secondary" className="h-full min-h-10 px-3" onClick={onEdit}>
-            <Edit2 size={16} />
-            Edit
-          </Button>
-          <Button variant="danger" className="h-full min-h-10 px-3" onClick={onDelete}>
-            <Trash2 size={16} />
-            Delete
-          </Button>
+        <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="grid gap-2 sm:grid-cols-3 lg:w-[24rem]">
+            <MiniStat label="Phases" value={stats.phases} />
+            <MiniStat label="Modules" value={stats.modules} />
+            <MiniStat label="Materials" value={stats.materials} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" className="h-10 px-3" onClick={onEdit}>
+              <Edit2 size={16} />
+              Edit
+            </Button>
+            <Button variant="danger" className="h-10 px-3" onClick={onDelete}>
+              <Trash2 size={16} />
+              Delete
+            </Button>
+          </div>
         </div>
       </div>
     </Card>
@@ -812,7 +833,7 @@ function PhaseWorkspace({
                   <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Selected Phase</p>
                 </div>
                 <h2 className="mt-2 text-xl font-semibold text-slate-950">{selectedPhase.title}</h2>
-                {selectedPhase.description ? <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-500">{selectedPhase.description}</p> : null}
+                {selectedPhase.description ? <p className="mt-2 max-w-6xl text-sm leading-6 text-slate-500">{compactText(selectedPhase.description, 620)}</p> : null}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => onAddModule(selectedPhase)}>
@@ -915,7 +936,7 @@ function ModuleDetailPanel({
             <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Selected Module</p>
           </div>
           <h2 className="mt-2 text-xl font-semibold text-slate-950">{courseModule.title}</h2>
-          {courseModule.description ? <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-500">{courseModule.description}</p> : null}
+          {courseModule.description ? <p className="mt-2 max-w-6xl text-sm leading-6 text-slate-500">{compactText(courseModule.description, 520)}</p> : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={onAddMaterial}>
