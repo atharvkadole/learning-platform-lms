@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router";
 import { AppLayout } from "../components/layout/AppLayout.jsx";
 import { useAuth } from "../lib/useAuth.js";
+import { LandingPage } from "../features/landing/LandingPage.jsx";
 import { LoginPage } from "../features/auth/LoginPage.jsx";
 import { AdminDashboardPage } from "../features/admin/dashboard/AdminDashboardPage.jsx";
 import { StudentsPage } from "../features/admin/students/StudentsPage.jsx";
@@ -12,7 +13,7 @@ import { StudentModulesPage } from "../features/student/modules/StudentModulesPa
 import { StudentAssessmentsPage } from "../features/student/assessments/StudentAssessmentsPage.jsx";
 import { StudentProfilePage } from "../features/student/profile/StudentProfilePage.jsx";
 
-function RootRedirect() {
+function WorkspaceRedirect() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
@@ -22,7 +23,10 @@ function RootRedirect() {
 function ProtectedRoute({ role, children }) {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    const loginPath = role === "ADMIN" ? "/login/teacher" : role === "STUDENT" ? "/login/student" : "/login";
+    return <Navigate to={loginPath} replace />;
+  }
   if (role && user.role !== role) return <Navigate to="/" replace />;
   return children;
 }
@@ -40,8 +44,11 @@ function LoadingScreen() {
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<RootRedirect />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/app" element={<WorkspaceRedirect />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/login/student" element={<LoginPage portal="student" />} />
+      <Route path="/login/teacher" element={<LoginPage portal="teacher" />} />
       <Route
         path="/admin"
         element={

@@ -2,7 +2,6 @@ import {
   BarChart3,
   BookOpen,
   ClipboardList,
-  GraduationCap,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -72,8 +71,8 @@ export function AppLayout({ role }) {
           )}
         >
           <div className={cn("flex h-20 items-center gap-3 border-b border-slate-200 px-4", sidebarCollapsed && "justify-center px-3")}>
-            <div className="grid size-11 place-items-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
-              <GraduationCap size={23} />
+            <div className="grid size-11 place-items-center overflow-hidden rounded-2xl bg-white shadow-lg shadow-blue-600/20 ring-1 ring-slate-200">
+              <img className="size-10 object-contain" src={branding.logoMark} alt="" />
             </div>
             <div className={cn("min-w-0", sidebarCollapsed && "hidden")}>
               <p className="text-sm font-semibold text-slate-950">{branding.appName}</p>
@@ -92,8 +91,8 @@ export function AppLayout({ role }) {
           >
             <div className="mb-3 flex h-14 items-center justify-between px-2">
               <div className="flex items-center gap-3">
-                <div className="grid size-10 place-items-center rounded-2xl bg-blue-600 text-white">
-                  <GraduationCap size={22} />
+                <div className="grid size-10 place-items-center overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+                  <img className="size-9 object-contain" src={branding.logoMark} alt="" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-slate-950">{branding.shortName}</p>

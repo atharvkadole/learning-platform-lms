@@ -4,9 +4,10 @@
   color: #17202a;
   background: #f6f7f9;
   color-scheme: light;
-  --brand-primary: #2563eb;
-  --brand-secondary: #0f172a;
-  --brand-accent: #7c3aed;
+  --brand-primary: #1070c0;
+  --brand-secondary: #001030;
+  --brand-accent: #0090a0;
+  --brand-danger: #e00020;
   --surface-page: #f6f7fb;
   --surface-card: rgba(255, 255, 255, 0.92);
   --border-subtle: rgba(148, 163, 184, 0.24);
@@ -60,7 +61,7 @@ a {
 }
 
 .focus-ring:focus-visible {
-  outline-color: #2563eb;
+  outline-color: #1070c0;
 }
 
 .premium-card {
@@ -182,6 +183,55 @@ a {
   background-color: rgb(15 23 42);
   border-color: rgb(51 65 85);
   color: rgb(241 245 249);
+}
+
+.landing-page {
+  color-scheme: light;
+  background-color: #ffffff;
+  color: #001030;
+}
+
+.dark .landing-page {
+  background-color: #ffffff;
+  color: #001030;
+}
+
+.dark .landing-page .bg-white,
+.dark .landing-page .bg-white\/80,
+.dark .landing-page .bg-white\/90 {
+  background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
+}
+
+.dark .landing-page .bg-white\/80 {
+  background-color: rgb(255 255 255 / 0.8);
+}
+
+.dark .landing-page .bg-white\/90 {
+  background-color: rgb(255 255 255 / 0.9);
+}
+
+.dark .landing-page .bg-slate-50 {
+  background-color: #f8fafc;
+}
+
+.dark .landing-page .text-slate-700 {
+  color: #334155;
+}
+
+.dark .landing-page .text-slate-600 {
+  color: #475569;
+}
+
+.dark .landing-page .text-slate-500 {
+  color: #64748b;
+}
+
+.dark .landing-page .border-slate-200 {
+  border-color: #e2e8f0;
+}
+
+.dark .landing-page .border-slate-300 {
+  border-color: #cbd5e1;
 }
 
 @media (prefers-reduced-motion: reduce) {
